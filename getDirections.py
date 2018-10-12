@@ -16,8 +16,7 @@ class getDirections():
         self.here_matrix_url = os.environ["HERE_MATRIX_URL"]
         self.homes_path = Path(args.homes)
         self.schools_path = Path(args.schools)
-        self.latitude = 0
-        self.longitude = 0
+        self.streetData = []
 
         with open(self.homes_path.as_posix()) as f:
             self.homes = json.load(f)
@@ -44,36 +43,29 @@ class getDirections():
         params = urllib.parse.urlencode(
             payload, safe="=", quote_via=urllib.parse.quote)
         r = requests.get(self.wake_streets_url, params=params)
-        print(f"{r.url}")
         return r.json()
 
     def requestSimpleRoute(self, payload):
         r = requests.get(self.here_simple_url, params=payload)
-        print(f"{r.url}")
         return r.json()
 
-    def getAddresses(self):
+    def getAddresses(self, street_name):
         call_params = {}
-        call_params['where'] = f"ST_NAME=\'{self.homes['FentonEstates'][0].upper()}\'"
+        call_params['where'] = f"ST_NAME=\'{street_name.upper()}\'"
         call_params['outFields'] = "ST_NUM"
         call_params['outSR'] = 4326
         call_params['f'] = 'json'
-        streetData = self.requestStreetInfo(call_params)
-        self.latitude = streetData['features'][0]['geometry']['y']
-        self.longitude = streetData['features'][0]['geometry']['x']
-        print(f"LATITUDE:   {self.latitude}")
-        print(f"LONGITUDE:  {self.longitude}")
+        self.streetData = self.requestStreetInfo(call_params)
 
-    def getRoute(self, destination):
+    def getRoute(self, start, destination):
         call_params = {}
         call_params['app_id'] = self.app_id
         call_params['app_code'] = self.app_code
-        call_params['waypoint0'] = f"geo!{self.latitude},{self.longitude}"
+        call_params['waypoint0'] = f"geo!{start['latitude']},{start['longitude']}"
         call_params['waypoint1'] = f"geo!{destination['latitude']},{destination['longitude']}"
         call_params['mode'] = "fastest;car;traffic:enabled"
         routeData = self.requestSimpleRoute(call_params)
-        print(
-            f"Travel Time: {ceil(routeData['response']['route'][0]['summary']['travelTime'] / 60)} minutes")
+        return routeData
 
 
 def main():
@@ -84,9 +76,25 @@ def main():
     arguments = parser.parse_args()
 
     directions = getDirections(arguments)
-    directions.getAddresses()
-    directions.getRoute(directions.schools['DDMS'])
-    directions.getRoute(directions.schools['ECMS'])
+    print("Neighborhood,Address,TimeToDDMS,TimeToECMS")
+    for key, value in directions.homes.items():
+        for street in value:
+            directions.getAddresses(street)
+            for item in directions.streetData['features']:
+                homeAddr = {}
+                homeAddr['number'] = item['attributes']['ST_NUM']
+                homeAddr['latitude'] = item['geometry']['y']
+                homeAddr['longitude'] = item['geometry']['x']
+                ddms_dir = directions.getRoute(
+                    homeAddr, directions.schools['DDMS'])
+                ecms_dir = directions.getRoute(
+                    homeAddr, directions.schools['ECMS'])
+                time_to_ddms = ceil(
+                    ddms_dir['response']['route'][0]['summary']['travelTime'] / 60)
+                time_to_ecms = ceil(
+                    ecms_dir['response']['route'][0]['summary']['travelTime'] / 60)
+                print(
+                    f"{key},\'{homeAddr['number']} {street.upper()}\',{time_to_ddms},{time_to_ecms}")
 
 
 if __name__ == "__main__":
