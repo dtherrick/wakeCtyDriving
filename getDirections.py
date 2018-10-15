@@ -6,6 +6,12 @@ import urllib
 from pathlib import Path
 from math import ceil
 
+# TODO:
+# 1. add car line wait time option
+# 2. add morning / afternoon option
+# 3. add round-trip option
+# 4. add store the route option
+
 
 class getDirections():
     def __init__(self, args):
@@ -63,6 +69,7 @@ class getDirections():
         call_params['app_code'] = self.app_code
         call_params['waypoint0'] = f"geo!{start['latitude']},{start['longitude']}"
         call_params['waypoint1'] = f"geo!{destination['latitude']},{destination['longitude']}"
+        call_params['departure'] = f"2018-10-10T11:30:00-04"
         call_params['mode'] = "fastest;car;traffic:enabled"
         routeData = self.requestSimpleRoute(call_params)
         return routeData
