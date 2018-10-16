@@ -7,10 +7,8 @@ from pathlib import Path
 from math import ceil
 
 # TODO:
-# 1. add car line wait time option
-# 2. add morning / afternoon option
-# 3. add round-trip option
-# 4. add store the route option
+# 1. add morning / afternoon option
+# 2. add store the route option
 
 
 class getDirections():
@@ -22,6 +20,7 @@ class getDirections():
         self.here_matrix_url = os.environ["HERE_MATRIX_URL"]
         self.homes_path = Path(args.homes)
         self.schools_path = Path(args.schools)
+        self.round_trip = args.round_trip
         self.streetData = []
 
         with open(self.homes_path.as_posix()) as f:
@@ -69,8 +68,10 @@ class getDirections():
         call_params['app_code'] = self.app_code
         call_params['waypoint0'] = f"geo!{start['latitude']},{start['longitude']}"
         call_params['waypoint1'] = f"geo!{destination['latitude']},{destination['longitude']}"
+        if self.round_trip:
+            call_params['waypoint2'] = f"geo!{start['latitude']},{start['longitude']}"
         call_params['departure'] = f"2018-10-10T11:30:00-04"
-        call_params['mode'] = "fastest;car;traffic:enabled"
+        call_params['mode'] = "balanced;car;traffic:enabled"
         routeData = self.requestSimpleRoute(call_params)
         return routeData
 
@@ -80,6 +81,10 @@ def main():
     parser.add_argument(
         '--homes', help='JSON file with the list of neighborhoods')
     parser.add_argument('--schools', help='JSON file with the list of schools')
+    parser.add_argument('--round_trip', action="store_true",
+                        help="Decide whether to calculate a round trip")
+    parser.add_argument('--car_line', action="store_true",
+                        help="Account for wait in car line.")
     arguments = parser.parse_args()
 
     directions = getDirections(arguments)
@@ -100,6 +105,9 @@ def main():
                     ddms_dir['response']['route'][0]['summary']['travelTime'] / 60)
                 time_to_ecms = ceil(
                     ecms_dir['response']['route'][0]['summary']['travelTime'] / 60)
+                if arguments.car_line:
+                    time_to_ddms += directions.schools['DDMS']['wait_time']
+                    time_to_ecms += directions.schools['ECMS']['wait_time']
                 print(
                     f"{key},\'{homeAddr['number']} {street.upper()}\',{time_to_ddms},{time_to_ecms}")
 
